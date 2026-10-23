@@ -51,8 +51,8 @@ token_before=$(docker exec "$container" sha256sum /var/lib/a13n-envd/http-token)
 docker stop "$container" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = 0
 docker start "$container" >/dev/null
+docker exec "$container" test -f /workspace/envd-smoke.txt
 docker exec -i "$container" python3 - < "$probe"
 test "$token_before" = "$(docker exec "$container" sha256sum /var/lib/a13n-envd/http-token)"
-docker exec "$container" test -f /workspace/envd-smoke.txt
 
 printf 'Smoke tests passed for %s\n' "$image"

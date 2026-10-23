@@ -57,6 +57,9 @@ session = call("session.open", {
     "required_methods": ["shell.exec"],
 })["descriptor"]["session_id"]
 try:
+    call("environment.readiness", {
+        "context": {"operation_id": "smoke-ready", "timeout_ms": 5000},
+    }, session)
     result = call("shell.exec", {
         "context": {"operation_id": "smoke-shell", "timeout_ms": 15000},
         "request": {

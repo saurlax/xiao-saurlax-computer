@@ -9,7 +9,7 @@ docker run --rm --network none "$image" /bin/bash -euc '
     test "${ANYCAP_NO_UPDATE:-}" = 1
     test -z "${ANYCAP_API_KEY:-}"
     for tool in bash zsh git ssh curl wget jq rg fd less nano vi ps ip ping \
-        dig nc unzip zip xz sqlite3 file tree tini setpriv a13n-envd \
+        dig nc unzip zip xz sqlite3 file tree tini setpriv ffmpeg ffprobe fc-list fc-match xxd a13n-envd \
         a13n-sandbox-entrypoint a13n-sandbox-init; do
         command -v "$tool" >/dev/null
     done
@@ -28,6 +28,10 @@ docker run --rm --network none "$image" /bin/bash -euc '
         ! command -v "$tool"
     done
 '
+
+# Check editing, subtitle rendering and output codecs as the unprivileged user.
+docker run --rm -i --network none --user 1000:1000 "$image" python3 - \
+    < "$(dirname "$0")/media-probe.py"
 
 # Confirm the image accepts runtime-only injection. This is a dummy value.
 docker run --rm --network none --env ANYCAP_API_KEY=smoke-test-placeholder \

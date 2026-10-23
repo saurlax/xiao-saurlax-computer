@@ -1,6 +1,6 @@
 # xiao-saurlax-computer
 
-A compact Linux toolbox for a13n environments, Modal Sandboxes, and Docker.
+A headless Linux toolbox for a13n environments, Modal Sandboxes, and Docker.
 
 ## Image
 
@@ -18,6 +18,10 @@ Included:
 - Python 3.13 with pip and venv; Node.js 24 with npm and npx.
 - AnyCap CLI 0.6.4, installed from checksum-verified upstream binaries.
 - Headless `a13n-envd` with EIP/HTTP support and the a13n sandbox launchers.
+- FFmpeg/ffprobe for editing, transitions, audio mixing, transcoding and frame
+  extraction, including H.264/AAC output and ASS subtitle rendering.
+- Fontconfig, Noto CJK and DejaVu fonts for Chinese/Latin titles and subtitles;
+  `xxd` for inspecting file signatures.
 - Git, SSH client, curl, wget, jq, ripgrep, fd, SQLite, archive tools, basic
   editors, and process/network diagnostics. Run `fd` rather than `fdfind`.
 
@@ -25,8 +29,14 @@ The working directory is `/workspace`. The default command is still Bash;
 the entrypoint runs `tini` and the a13n bootstrap before the requested command.
 No daemon starts unless requested. The container and daemon retain root; a13n
 file operations and commands use the `sandbox` account (UID/GID 1000), which owns
-`/workspace`. It omits desktop software, browsers, FFmpeg, compilers, and a Docker
-daemon. Add those only if a task needs them.
+`/workspace`. It omits desktop software, browsers, compilers, and a Docker daemon.
+FFmpeg and its font/rendering libraries do not require a desktop session.
+
+Use the installed `ffmpeg` and `ffprobe` instead of downloading static binaries
+at run time. `fc-match 'Noto Sans CJK SC'` resolves a Chinese subtitle font.
+Use absolute input/output paths when running parallel downloads; `ffprobe`
+inspects one input per invocation. Sandbox sessions cannot install apt packages;
+for extra Python libraries, create a venv under `/workspace` and use its Python.
 
 ## Runtime token injection
 
@@ -110,7 +120,9 @@ sh scripts/smoke-test.sh xiao-saurlax-computer:local
 Smoke tests run offline with no real AnyCap token. They check tools, versions,
 the MCP entry point, absence of saved credentials and desktop executables,
 runtime environment injection, and the same headless launch used by Modal.
-An authenticated HTTP EIP session executes AnyCap and writes a workspace file
+An offline UID 1000 media test creates a crossfade, renders Chinese subtitles,
+encodes H.264/AAC, probes the result and extracts a frame. An authenticated HTTP
+EIP session executes AnyCap and writes a workspace file
 as UID/GID 1000. Tests also verify rejection of unauthenticated requests,
 protected HTTP credentials, clean shutdown, and container restart. They do not
 make paid AnyCap API requests.

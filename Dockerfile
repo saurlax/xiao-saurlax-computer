@@ -7,7 +7,7 @@ FROM node:24-trixie-slim AS node
 FROM python:3.13-slim-trixie
 
 LABEL org.opencontainers.image.title="xiao-saurlax-computer" \
-      org.opencontainers.image.description="A headless Debian toolbox with a13n-envd, Python, Node.js, and AnyCap" \
+      org.opencontainers.image.description="A headless Debian toolbox with a13n-envd, AnyCap, FFmpeg and subtitle fonts" \
       org.opencontainers.image.source="https://github.com/saurlax/xiao-saurlax-computer" \
       ai.a13n.environment.user="sandbox"
 
@@ -23,6 +23,15 @@ RUN apt-get update \
         iproute2 iputils-ping jq less nano netcat-openbsd openssh-client procps \
         libgcc-s1 ripgrep sqlite3 tini tree unzip util-linux vim-tiny wget xz-utils zip zsh \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Keep the base toolbox layer reusable and retain media downloads across retries.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=3 update \
+    && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+        ffmpeg fontconfig fonts-dejavu-core fonts-noto-cjk xxd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node

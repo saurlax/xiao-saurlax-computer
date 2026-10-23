@@ -14,16 +14,19 @@ an exact build, since rebuilding a commit can pick up newer base images.
 
 Included:
 
-- Debian 12 Bookworm slim with Bash, Zsh, and UTF-8 support.
+- Debian 13 Trixie slim with Bash, Zsh, and UTF-8 support.
 - Python 3.13 with pip and venv; Node.js 24 with npm and npx.
 - AnyCap CLI 0.6.4, installed from checksum-verified upstream binaries.
+- Headless `a13n-envd` with EIP/HTTP support and the a13n sandbox launchers.
 - Git, SSH client, curl, wget, jq, ripgrep, fd, SQLite, archive tools, basic
   editors, and process/network diagnostics. Run `fd` rather than `fdfind`.
 
-The working directory is `/workspace`. The default command is Bash; no server
-or daemon starts automatically. The image uses root for compatibility with
-agent sandboxes. It omits desktop software, browsers, FFmpeg, compilers, and a
-Docker daemon. Add those only if a task needs them.
+The working directory is `/workspace`. The default command is still Bash;
+the entrypoint runs `tini` and the a13n bootstrap before the requested command.
+No daemon starts unless requested. The container and daemon retain root; a13n
+file operations and commands use the `sandbox` account (UID/GID 1000), which owns
+`/workspace`. It omits desktop software, browsers, FFmpeg, compilers, and a Docker
+daemon. Add those only if a task needs them.
 
 ## Runtime token injection
 
@@ -74,17 +77,23 @@ It requires an already authenticated Modal SDK on the machine running it.
 ### a13n
 
 Set the Modal environment template's image to
-`ghcr.io/saurlax/xiao-saurlax-computer:latest`. The image provides the default
-guest Python path `/usr/local/bin/python3` expected by the a13n Modal provider.
-An idle stop of 600 seconds is a reasonable starting point.
+`ghcr.io/saurlax/xiao-saurlax-computer:latest` and leave Desktop disabled.
+Recreate an existing environment after changing the image: updating a tag does
+not replace a running sandbox or an old filesystem snapshot.
 
-The currently inspected a13n Modal provider exposes image/CPU/memory/timeout
-configuration but does **not** forward custom environment variables or Modal
-Secrets into `Sandbox.create`. Changing the image alone therefore installs
-AnyCap but does not authenticate it. Using runtime secrets through that provider
-requires an a13n integration change; the standalone Modal example demonstrates
-the supported SDK path. Do not put a token in the template image string or
-build it into the image as a workaround.
+a13n switched Modal execution to Envd/EIP in commit `68a0d437a` (PR #1168).
+It explicitly launches `a13n-sandbox-entrypoint a13n-envd`, authenticates through
+the generated `/var/lib/a13n-envd/http-token`, and executes sessions as UID/GID
+1000. This image implements that headless contract without X11, VNC, or browser
+packages. A separate token is generated at first HTTP startup with mode 0600;
+the image contains no token, and a container restart preserves its token.
+
+On a13n versions supporting environment variables, set `ANYCAP_API_KEY` in the
+Modal template's environment variables. a13n forwards these defaults to shell
+commands and subprocesses. Those template values are ordinary saved
+configuration; use them only where its storage and access controls are suitable.
+The standalone example above uses a Modal Secret instead. Never put a token in
+the image name, a build argument, or a committed file.
 
 The image itself provides no persistent storage. a13n manages stop/resume
 filesystem snapshots; direct Modal users must configure Volumes or snapshots
@@ -98,9 +107,20 @@ docker buildx build --load -t xiao-saurlax-computer:local .
 sh scripts/smoke-test.sh xiao-saurlax-computer:local
 ```
 
-Smoke tests run offline with no real token. They check tools, runtime versions,
-the MCP entry point, the absence of saved AnyCap credentials, and runtime
-environment injection. They do not make paid AnyCap API requests.
+Smoke tests run offline with no real AnyCap token. They check tools, versions,
+the MCP entry point, absence of saved credentials and desktop executables,
+runtime environment injection, and the same headless launch used by Modal.
+An authenticated HTTP EIP session executes AnyCap and writes a workspace file
+as UID/GID 1000. Tests also verify rejection of unauthenticated requests,
+protected HTTP credentials, clean shutdown, and container restart. They do not
+make paid AnyCap API requests.
+
+The envd binary is copied from the official multi-architecture `dev-slim` image
+at a fixed manifest digest. Launcher sources and their Apache-2.0 license are
+vendored under `runtime/`; see [runtime/README.md](runtime/README.md) for provenance.
+Trixie matches the official envd runtime's libc rather than copying a newer
+binary into Bookworm. To update envd, review the upstream protocol compatibility,
+refresh the pinned digest and launchers, and rerun the EIP smoke tests.
 
 ## Publishing
 
